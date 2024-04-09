@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama de fases binário</title>
+    <style>
+        input{
+            width: 50px;
+            font: normal 18px Arial white;
+        }
+        body{
+            font: normal 18px Arial white;
+            text-align: center;
+        }
+        div#myPlot{
+            width:100%;
+            max-width:700px;
+            margin: auto
+        }
+        h1{
+            font: bold 28px Arial;
+            text-align: center;
+        }
+        p#param{
+            font: normal 18px Arial
+        }
+        p#psats{
+            text-align: center;
+            font: normal 18px Arial
+        }
+        select{
+            font: normal 16px Arial;
+        }
+    </style>
+    <script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG"></script>
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js" charset="utf-8"></script>
+</head>
+<body>
+    <!-- Head -->
+    <h1>Diagrama de Equilíbrio Líquido-Vapor para Sistemas Binários</h1>
+
+    <!-- Select the thermodynamic model -->
+    <p>Selecione o modelo termodinâmico: <select id="model">
+        <option value="0">Margules dois sufixos</option>
+        <option value="1">Margules três sufixos</option>
+        <option value="2">NRTL</option>
+    </select></p>
+    <!-- Model selected-->
+    <p id = "textmodel">Modelo: \(G^{exc} = nRT\beta x_Ax_B\)</p>
+    <!-- Inputs -->
+    <p id="param"></p>
+    <p id="psats">\(P^{sat}_A\)= <input type="number" name="PsatA" id="PsatA" value="1.0" step="0.1" min="0.1"> bar, 
+        \(P^{sat}_B\) = <input type="number" name="PsatB" id="PsatB" value="0.5" step="0.1" min="0.1"> bar</p>
+    <!-- Graph -->
+    <div id="myPlot"></div>
+    
+    <!-- Script -->
+    <script>
+        let model = document.querySelector('select#model')
+        model.addEventListener("click",writemodel)
+        writemodel()
+        
+        function writemodel(){
+            let textmodel = document.querySelector('p#textmodel')
+
+            if (model.value==0){
+                textmodel.innerHTML = "Modelo: \\(G^{exc} = nRT\\beta x_Ax_B\\)"
+            } else if (model.value==1) {
+                textmodel.innerHTML = "Modelo: \\(G^{exc} = nRTx_Ax_B\(\\beta_{B,A} x_A + \\beta_{A,B} x_B\)\\)"
+            } else if (model.value == 2) {
+                textmodel.innerHTML = "Modelo: \\(G^{exc} = nRT \\left( \\displaystyle \\frac{\\tau_{B,A}\\exp\\left(-\\alpha\\tau_{B,A}\\right)}{x_A + x_B\\exp\\left(-\\alpha\\tau_{B,A}\\right)} +  \\frac{\\tau_{A,B}\\exp\\left(-\\alpha\\tau_{A,B}\\right)}{x_B + x_A\\exp\\left(-\\alpha\\tau_{A,B}\\right)} \\right)x_Ax_B\\)"
+            }
+            MathJax.Hub.Queue(["Typeset",MathJax.Hub,"textmodel"]); 
+            // Adjust the parameters
+            if (model.value==0){
+                document.querySelector("p#param").innerHTML = `Parâmetro: \\(\\beta\\) = <input type="number" name="beta" id="beta" value="0.0" step="0.1">`
+                let inputBeta = document.querySelector("input#beta");
+                inputBeta.addEventListener("input",exec);
+            } else if (model.value==1){
+                document.querySelector("p#param").innerHTML = `Parâmetros: \\(\\beta_{A,B}\\) = <input type="number" id="betaAB" value="0.0" step="0.1">, \\(\\beta_{B,A}\\) = <input type="number" id="betaBA" value="0.0" step="0.1">`
+                let inputBetaAB = document.querySelector("input#betaAB");
+                inputBetaAB.addEventListener("input",exec);
+                let inputBetaBA = document.querySelector("input#betaBA");
+                inputBetaBA.addEventListener("input",exec);
+            } else if (model.value==2){
+                document.querySelector("p#param").innerHTML = `Parâmetros: \\(\\alpha\\) = <input type="number" id="alpha" value="0.30" step="0.01" style="width: 60px">, \\(\\tau_{A,B}\\) = <input type="number" id="tauAB" value="0.0" step="0.1">, \\(\\tau_{B,A}\\) = <input type="number" id="tauBA" value="0.0" step="0.1">`
+                let inputAlpha = document.querySelector("input#alpha");
+                inputAlpha.addEventListener("input",exec);
+                let inputTauAB = document.querySelector("input#tauAB");
+                inputTauAB.addEventListener("input",exec);
+                let inputTauBA = document.querySelector("input#tauBA");
+                inputTauBA.addEventListener("input",exec);
+            }
+            MathJax.Hub.Queue(["Typeset",MathJax.Hub,"param"]); 
+            exec()
+        }
+        // Linspace function
+        function linspace(startValue, stopValue, cardinality) {
+            var arr = [];
+            var step = (stopValue - startValue) / (cardinality - 1);
+            for (var i = 0; i < cardinality; i++) {
+                arr.push(startValue + (step * i));
+            }
+            return arr;
+        }
+        // Create a graph
+        exec()
+
+        // Variables
+        let inputA = document.querySelector("input#PsatA");
+        let inputB = document.querySelector("input#PsatB");
+        // Add events
+        inputA.addEventListener("input",exec);
+        inputB.addEventListener("input",exec);
+
+        // Program
+        function exec(){
+            let x = linspace(0,1,101);
+            let Psat = [Number(document.getElementById("PsatA").value),Number(document.getElementById("PsatB").value)]
+            let P = [];
+            let y = [];
+            
+            for(let i = 0; i<x.length;i++){
+                let gamma = []
+                if (model.value==0){
+                    let beta = Number(document.getElementById("beta").value);
+                    gamma[0] = Math.exp(beta*(1-x[i])**2);
+                    gamma[1] = Math.exp(beta*(x[i])**2);
+                } else if (model.value==1){
+                    let betaAB = Number(document.getElementById("betaAB").value);
+                    let betaBA = Number(document.getElementById("betaBA").value);
+                    gamma[0] = Math.exp((betaAB+2*(betaBA-betaAB)*x[i])*(1-x[i])**2);
+                    gamma[1] = Math.exp((betaBA+2*(betaAB-betaBA)*(1-x[i]))*x[i]**2);
+                } else if (model.value == 2){
+                    let alpha = Number(document.getElementById("alpha").value);
+                    let tauAB = Number(document.getElementById("tauAB").value);
+                    let tauBA = Number(document.getElementById("tauBA").value);
+                    GAB = Math.exp(-alpha*tauAB);
+                    GBA = Math.exp(-alpha*tauBA);
+                    gamma[0] = Math.exp((1-x[i])**2*(tauBA*(GBA/(x[i]+ (1-x[i])*GBA))**2 + tauAB*GAB/((1-x[i]) + x[i]*GAB)**2));
+                    gamma[1] = Math.exp(x[i]**2*(tauAB*(GAB/((1-x[i])+ x[i]*GAB))**2 + tauBA*GBA/(x[i] + (1-x[i])*GBA)**2));
+                }
+                P[i] = x[i]*gamma[0]*Psat[0] + (1.0-x[i])*gamma[1]*Psat[1];
+                y[i] = x[i]*gamma[0]*Psat[0]/P[i];
+            }
+
+            var data = [
+                {x: x, y: P, mode:"lines", name: "liquid"},
+                {x: y, y: P, mode:"lines", name: "vapor"}
+            ];
+            
+            var layout = {
+                title: "Diagrama de fases",
+                xaxis: {range: [0,1],title: '$x_A, y_A$', showline: true},
+                yaxis: {range: [Math.min(P),Math.max(P)], title: 'Pressão (bar)'},
+                showlegend: false,
+            };
+                    
+            Plotly.newPlot("myPlot", data, layout);
+        }
+      </script>
+</body>
+</html> 
